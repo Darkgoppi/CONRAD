@@ -33,7 +33,7 @@ public class SimplePhantom extends Grid2D{
 		
 		for (int i = startPointI; i < boxSize; i++) {
 			for (int j = startPointJ; j < boxSize; j++) {
-				setAtIndex(i, j, 0.4f);
+				this.setAtIndex(i, j, 0.4f);
 			}
 		}
 		
@@ -52,18 +52,22 @@ public class SimplePhantom extends Grid2D{
 			for (int j = center[1]-(int)radius; j <= center[1]+(int)radius; j++) {
 				double tmpRadius = Math.sqrt(Math.pow((i-center[0]), 2) + Math.pow((j-center[1]), 2));
 				if (tmpRadius <= radius) {
-					setAtIndex(i, j, 0.8f);
+					this.setAtIndex(i, j, 0.8f);
 				}
 			}
 		}
 		
-		// add a triangle to the pahntom
+		// add a triangle to the phantom
 		int bottomWidth = (int)(width * 0.25);
 		int triaHeight = (int)(height * 0.4);
 		int ratio = triaHeight/bottomWidth;
 
+		int idx = 0;
 		for (int j = height - 1; j >= height - triaHeight; j--) {
-			for (int i = width - 1; i >= width - )
+			for (int i = width - 1; i >= width - bottomWidth - idx * ratio; i--) {
+				this.setAtIndex(i, j, 0.6f);
+			}
+			idx++;
 		}
 		
 	}
