@@ -11,7 +11,7 @@ public class SimplePhantom extends Grid2D{
 		
 		double[] spacing = new double[]{0.5, 0.5};
 		
-		SimplePhantom phant = new SimplePhantom(256, 256, spacing);
+		SimplePhantom phant = new SimplePhantom(128, 256, spacing);
 		phant.show();
 	}
 
@@ -22,6 +22,7 @@ public class SimplePhantom extends Grid2D{
 		
 		// add a quadratic shape to the phantom
 		int boxSize = 0;
+//		int rectangleWidth = (int)(width*0.3);
 		if (width < height) {
 			boxSize = (int)(width * 0.66);
 		} else {
@@ -57,11 +58,22 @@ public class SimplePhantom extends Grid2D{
 			}
 		}
 		
+
+		
+//		int recStartI = (height - boxSize)/4;
+//		int recStartJ = (width - rectangleWidth)/2;
+//		for (int i = recStartI; i < boxSize; i++) {
+//			for (int j = recStartJ; j < rectangleWidth; j++) {
+//				this.setAtIndex(i, j, 0.6f);
+//			}
+//		}
+		
+		
 		// add a triangle to the phantom
-		int triaStart = height - boxSize;
-		int triaWStart = width - boxSize;
-		for (int i = triaStart; i < height; i++) {
-			for (int j = triaWStart; j <= i; j++) {
+//		int triaStart = height - boxSize;
+//		int triaWStart = width - boxSize;
+		for (int i = 0; i < boxSize/2; i++) {
+			for (int j = 0; j <= i; j++) {
 				this.setAtIndex(i, j, 0.6f);
 			}
 		}
