@@ -23,16 +23,16 @@ public class SimplePhantom extends Grid2D{
 		// add a quadratic shape to the phantom
 		int boxSize = 0;
 		if (width < height) {
-			boxSize = (int)(width * 0.75);
+			boxSize = (int)(width * 0.66);
 		} else {
-			boxSize = (int)(height * 0.75);
+			boxSize = (int)(height * 0.66);
 		}
 		
-		int startPointI = (width - boxSize)/2;
+		int startPointI = (width - boxSize)/3;
 		int startPointJ = (height - boxSize)/2;
 		
-		for (int i = startPointI; i < boxSize; i++) {
-			for (int j = startPointJ; j < boxSize; j++) {
+		for (int i = startPointI; i < startPointI+boxSize; i++) {
+			for (int j = startPointJ; j < startPointJ+boxSize; j++) {
 				this.setAtIndex(i, j, 0.4f);
 			}
 		}
@@ -58,16 +58,12 @@ public class SimplePhantom extends Grid2D{
 		}
 		
 		// add a triangle to the phantom
-		int bottomWidth = (int)(width * 0.25);
-		int triaHeight = (int)(height * 0.4);
-		int ratio = triaHeight/bottomWidth;
-
-		int idx = 0;
-		for (int j = height - 1; j >= height - triaHeight; j--) {
-			for (int i = width - 1; i >= width - bottomWidth - idx * ratio; i--) {
+		int triaStart = height - boxSize;
+		int triaWStart = width - boxSize;
+		for (int i = triaStart; i < height; i++) {
+			for (int j = triaWStart; j <= i; j++) {
 				this.setAtIndex(i, j, 0.6f);
 			}
-			idx++;
 		}
 		
 	}
