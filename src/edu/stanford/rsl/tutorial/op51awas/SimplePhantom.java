@@ -11,14 +11,25 @@ public class SimplePhantom extends Grid2D{
 		
 		double[] spacing = new double[]{0.5, 0.5};
 		
-		SimplePhantom phant = new SimplePhantom(128, 256, spacing);
+		SimplePhantom phant = new SimplePhantom(500, 500, spacing);
 		phant.show();
+		
+		double[] origin = phant.getOrigin();
+		for (int i = 0; i < origin.length; i++) {
+			System.out.println(origin[i]);
+		}
 	}
 
 	public SimplePhantom(int width, int height, double[] spacing) {
 		// create Grid2D with given width and height by calling constructor of super class
 		super(width, height);
 		setSpacing(spacing);
+		
+		double[] origin = new double[2];
+		origin[0] = -(width-1)*(spacing[0]/2);
+		origin[1] = -(height-1)*(spacing[1]/2);
+		
+		setOrigin(origin);
 		
 		// add a quadratic shape to the phantom
 		int boxSize = 0;
@@ -72,8 +83,9 @@ public class SimplePhantom extends Grid2D{
 		// add a triangle to the phantom
 //		int triaStart = height - boxSize;
 //		int triaWStart = width - boxSize;
-		for (int i = 0; i < boxSize/2; i++) {
-			for (int j = 0; j <= i; j++) {
+		int startPoint = (int)(boxSize*0.2);
+		for (int i = startPoint; i < boxSize/2; i++) {
+			for (int j = startPoint; j <= i; j++) {
 				this.setAtIndex(i, j, 0.6f);
 			}
 		}
