@@ -24,6 +24,8 @@ public class Testing {
 		phant1.show();
 		
 		System.out.println(InterpolationOperators.interpolateLinear(phant2, 42, 42.5));
+		
+		System.out.println(Double.toString(phant1.indexToPhysical(0, 0)[0]));
 	}
 	
 }
