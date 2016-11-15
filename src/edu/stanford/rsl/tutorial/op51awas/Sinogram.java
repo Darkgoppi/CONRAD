@@ -3,11 +3,14 @@ package edu.stanford.rsl.tutorial.op51awas;
 import java.util.ArrayList;
 
 import edu.stanford.rsl.conrad.data.numeric.Grid2D;
+import edu.stanford.rsl.conrad.data.numeric.InterpolationOperators;
 import edu.stanford.rsl.conrad.geometry.AbstractCurve;
 import edu.stanford.rsl.conrad.geometry.AbstractShape;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.Box;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.PointND;
+import edu.stanford.rsl.conrad.geometry.shapes.simple.StraightLine;
 import edu.stanford.rsl.conrad.geometry.transforms.Transform;
+import edu.stanford.rsl.conrad.numerics.SimpleVector;
 
 public class Sinogram {
 	
@@ -21,7 +24,10 @@ public class Sinogram {
 	private Grid2D sinogram;
 	
 	public static void main(String[] args) {
-		
+		Sinogram sinogram = new Sinogram(100, 256, 1.0);
+		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5});
+		sinogram.computeSinogram(phantom, 1.0);
+		sinogram.getSinogram().show("sinogram");
 	}
 	
 	public Sinogram(int numOfProjections, int detectorSize, double detectorSpacing) {
@@ -60,23 +66,48 @@ public class Sinogram {
 			for (int j = 0; j < detectorSize; j++) {
 				
 				double[] detectorPosition = sinogram.indexToPhysical(j, i);
-				double x = Math.sin(angle)*detectorPosition[0];
-				double y = Math.cos(angle)*detectorPosition[0];
+				double detectorX = Math.sin(angle)*detectorPosition[0];
+				double detectorY = Math.cos(angle)*detectorPosition[1];
+				PointND detectorPoint = new PointND(detectorX, detectorY,0);
 				
-//				AbstractCurve curve = new AbstractCurve()
-//				box.getHitsOnBoundingBox(curve)
+				double dirX = Math.sin(angle);
+				double dirY = Math.cos(angle);
+				PointND dirPoint = new PointND((-dirX + detectorX), (dirY + detectorY),0);
+				
+				StraightLine intLine = new StraightLine(detectorPoint, dirPoint);
+				ArrayList<PointND> borderPoints = box.intersect(intLine);
+				
+				if(borderPoints.size() == 2){
+					PointND start = borderPoints.get(0);
+					SimpleVector dir = start.getAbstractVector().clone();
+					dir.subtract(borderPoints.get(1).getAbstractVector());
+					double length = dir.normL2();
 					
+					dir.divideBy(length / samplingRate);
+					
+					SimpleVector startVec = start.getAbstractVector();
+					
+					float sum = 0.0f;
+					for (int t = 0; t < (length/samplingRate); t++) {
+						startVec.add(dir);
+						double x = startVec.getElement(0);
+						double y = startVec.getElement(1);
+						
+						double[] coords = image.physicalToIndex(x, y);
+						
+						sum += InterpolationOperators.interpolateLinear(image, coords[0], coords[1]);
+						
+					}
+					
+					sinogram.setAtIndex(j, i, sum);
+					
+				}
+				
 			}
 		}
 	}
 	
-	private double getPositionOnDetector(int idx) {
-		int center = detectorSize/2;
-		
-		if (idx < center) {
-			return - (center - idx) * detectorSpacing;
-		} else {
-			return (center - idx) * detectorSpacing;
-		}
+	public Grid2D getSinogram() {
+		return this.sinogram;
 	}
 }
