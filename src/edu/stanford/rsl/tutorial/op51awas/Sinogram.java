@@ -4,12 +4,9 @@ import java.util.ArrayList;
 
 import edu.stanford.rsl.conrad.data.numeric.Grid2D;
 import edu.stanford.rsl.conrad.data.numeric.InterpolationOperators;
-import edu.stanford.rsl.conrad.geometry.AbstractCurve;
-import edu.stanford.rsl.conrad.geometry.AbstractShape;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.Box;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.PointND;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.StraightLine;
-import edu.stanford.rsl.conrad.geometry.transforms.Transform;
 import edu.stanford.rsl.conrad.numerics.SimpleVector;
 
 public class Sinogram {
@@ -61,7 +58,7 @@ public class Sinogram {
 		
 		
 		for (int i = 0; i < numOfProjections; i++) {
-			angle = i*angularIncrement;
+			angle = i*angularIncrement * (Math.PI/180);
 			
 			for (int j = 0; j < detectorSize; j++) {
 				
