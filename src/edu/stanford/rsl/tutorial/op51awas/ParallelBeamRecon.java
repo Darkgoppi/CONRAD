@@ -3,6 +3,7 @@ package edu.stanford.rsl.tutorial.op51awas;
 import java.util.ArrayList;
 
 import edu.stanford.rsl.conrad.data.numeric.Grid1D;
+import edu.stanford.rsl.conrad.data.numeric.Grid1DComplex;
 import edu.stanford.rsl.conrad.data.numeric.Grid2D;
 import edu.stanford.rsl.conrad.data.numeric.InterpolationOperators;
 import edu.stanford.rsl.conrad.data.numeric.NumericPointwiseOperators;
@@ -14,6 +15,8 @@ import edu.stanford.rsl.conrad.numerics.SimpleOperators;
 import edu.stanford.rsl.conrad.numerics.SimpleVector;
 
 public class ParallelBeamRecon {
+	
+	public enum FilterType {NONE, RAMLAK, RAMP};
 	
 	private int numOfProjections;
 	private double angularIncrement;
@@ -133,6 +136,7 @@ public class ParallelBeamRecon {
 		backProj.setSpacing(spacing);
 		backProj.setOrigin(-(width-1)/2*spacing[0], -(height-1)/2*spacing[1]);
 		
+		// walk over all lines in sinogram
 		for (int i = 0; i < sinoheight; i++) {
 			double realAngle = i * heightSpacing;
 			double xValue = Math.cos(realAngle);
@@ -145,7 +149,7 @@ public class ParallelBeamRecon {
 					double[] coords = backProj.indexToPhysical(x, y);
 					SimpleVector pix = new SimpleVector(coords[0], coords[1]);
 					double innerPro = SimpleOperators.multiplyInnerProd(normVek, pix);
-					double dist = innerPro + sinowidth/2;
+					double dist = innerPro + (sinowidth-1)/2;
 					double index = dist / widthSpacing;
 					Grid1D sub = new Grid1D(sinogram.getSubGrid(i));
 					if(sub.getSize()[0] <= index+1 || index < 0){
@@ -158,6 +162,53 @@ public class ParallelBeamRecon {
 		}
 		NumericPointwiseOperators.divideBy(backProj, (float)(sinoheight / Math.PI));
 		return backProj;
+	}
+	
+	public Grid2D filterSino(Grid2D sinogram, FilterType filterType) {
+		
+		// initialize filter grid
+		int filterSize = sinogram.getSize()[0];
+		Grid1DComplex filter = new Grid1DComplex(filterSize);
+		
+		// definition of filters
+		if (filterType == FilterType.NONE) {
+			// no filter to apply
+			return sinogram;
+		} else if (filterType == FilterType.RAMLAK) {
+			// generate ramlak filter in spatial domain and convert it to frequency domain
+			
+			// apply definition of ramlak filter to Grid1D
+			filter.setAtIndex(0, 0.25f);
+			float factorOdd = -1.0f/(float)Math.pow(Math.PI, 2);
+			for (int i = 1; i < filterSize/2; i++) {
+				if (i%2 == 1) {
+					filter.setAtIndex(i, factorOdd/(float)Math.pow(i,2));
+				} else {
+					filter.setAtIndex(i, 0.0f);
+				}
+			}
+			float tmp;
+			for (int i = filterSize/2; i < filterSize; i++) {
+				tmp = filterSize - i;
+                if(1 == (i%2)){
+                    filter.setAtIndex(i, factorOdd / (float) Math.pow(tmp, 2));
+                }
+			}
+			
+			// convert filter into frequency domain
+			filter.transformForward();
+			
+		} else {
+			// generate ramp filter directly in frequency domain no conversion required
+			
+			filter.setAtIndex(0, 0.0f);
+			
+		}
+		
+		
+		
+		
+		return sinogram;
 	}
 	
 	public Grid2D getSinogram() {
