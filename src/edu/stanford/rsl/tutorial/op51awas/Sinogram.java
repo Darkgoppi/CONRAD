@@ -1,15 +1,16 @@
 package edu.stanford.rsl.tutorial.op51awas;
 
-import imagescience.transform.Transform;
-
 import java.util.ArrayList;
 
+import edu.stanford.rsl.conrad.data.numeric.Grid1D;
 import edu.stanford.rsl.conrad.data.numeric.Grid2D;
 import edu.stanford.rsl.conrad.data.numeric.InterpolationOperators;
+import edu.stanford.rsl.conrad.data.numeric.NumericPointwiseOperators;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.Box;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.PointND;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.StraightLine;
 import edu.stanford.rsl.conrad.geometry.transforms.Translation;
+import edu.stanford.rsl.conrad.numerics.SimpleOperators;
 import edu.stanford.rsl.conrad.numerics.SimpleVector;
 
 public class Sinogram {
@@ -17,7 +18,7 @@ public class Sinogram {
 	private int numOfProjections;
 	private double angularIncrement;
 	private int detectorSize;
-	private double detectorSpacing;
+//	private double detectorSpacing;
 	
 	private Box box;
 	
@@ -29,40 +30,49 @@ public class Sinogram {
 		phantom.show("phantom");
 		sinogram.computeSinogram(phantom, 1.0);
 		sinogram.getSinogram().show("sinogram");
+		
+		sinogram.backProj(sinogram.getSinogram(), phantom).show("Backproj");
 	}
 	
 	public Sinogram(int numOfProjections, int detectorSize, double detectorSpacing) {
 		this.numOfProjections = numOfProjections;
 		this.angularIncrement = Math.PI/numOfProjections;
 		this.detectorSize = detectorSize;
-		this.detectorSpacing = detectorSpacing;
+//		this.detectorSpacing = detectorSpacing;
 		
 		this.sinogram = new Grid2D(detectorSize, numOfProjections);
 		this.sinogram.setSpacing(detectorSpacing, angularIncrement);
-		double[] origin = new double[2];
+//		double[] origin = new double[2];
 		this.sinogram.setOrigin(-(detectorSize-1)*(detectorSpacing/2.0), 0);
 	}
 	
+	/**
+	 * generates the sinogram from a given 2D image
+	 * @param image - given image
+	 * @param samplingRate - sampling rate along the ray through the image
+	 * @return sinogram
+	 */
 	public Grid2D computeSinogram(Grid2D image, double samplingRate) {
 		
+		// compute physical size of input image
 		double width = image.getSize()[0] * image.getSpacing()[0];
 		double height = image.getSize()[1] * image.getSpacing()[1];
 	
+		// generate translation to shift box into physical origin of input image
         Translation trans = new Translation(image.getOrigin()[0], image.getOrigin()[1], -1);
 		
+        // box for overlaying image to get hits of a line at the image borders
 		box = new Box(width, height, 2);
 		box.applyTransform(trans);
 		
+		// initial angle of detector
 		double angle = 0.0;
+		
 		
 		for (int i = 0; i < numOfProjections; i++) {
 			angle = i*angularIncrement;
 			
 			for (int j = 0; j < detectorSize; j++) {
-				
-				if (j == 450) {
-					System.out.println("");
-				}
 				
 				double detectorPosition = sinogram.indexToPhysical(j, i)[0];
 				double detectorX = Math.sin(angle)*detectorPosition;
@@ -107,6 +117,47 @@ public class Sinogram {
 		}
 		
 		return sinogram;
+	}
+	
+	public Grid2D backProj(Grid2D sinogram, Grid2D phantom) {
+		
+		int sinowidth = sinogram.getWidth();
+		double widthSpacing = sinogram.getSpacing()[0];
+		int sinoheight = sinogram.getHeight();
+		double heightSpacing = sinogram.getSpacing()[1];
+		int width = phantom.getWidth();
+		int height = phantom.getHeight();
+		double[] spacing = phantom.getSpacing();
+		
+		Grid2D backProj = new Grid2D(width, height);
+		backProj.setSpacing(spacing);
+		backProj.setOrigin(-(width-1)/2*spacing[0], -(height-1)/2*spacing[1]);
+		
+		for (int i = 0; i < sinoheight; i++) {
+			double realAngle = i * heightSpacing;
+			double xValue = Math.cos(realAngle);
+			double yValue = Math.sin(realAngle);
+			
+			SimpleVector normVek = new SimpleVector(yValue, xValue);
+			
+			for (int x = 0; x < backProj.getSize()[0]; x++) {
+				for (int y = 0; y < backProj.getSize()[1]; y++) {
+					double[] coords = backProj.indexToPhysical(x, y);
+					SimpleVector pix = new SimpleVector(coords[0], coords[1]);
+					double innerPro = SimpleOperators.multiplyInnerProd(normVek, pix);
+					double dist = innerPro + sinowidth/2;
+					double index = dist / widthSpacing;
+					Grid1D sub = new Grid1D(sinogram.getSubGrid(i));
+					if(sub.getSize()[0] <= index+1 || index < 0){
+						continue;
+					}
+					float intens = InterpolationOperators.interpolateLinear(sub, index);
+					backProj.addAtIndex(x, y, intens);
+				}
+			}
+		}
+		NumericPointwiseOperators.divideBy(backProj, (float)(sinoheight / Math.PI));
+		return backProj;
 	}
 	
 	public Grid2D getSinogram() {
