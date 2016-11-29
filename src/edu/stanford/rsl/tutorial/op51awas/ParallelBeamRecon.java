@@ -13,7 +13,7 @@ import edu.stanford.rsl.conrad.geometry.transforms.Translation;
 import edu.stanford.rsl.conrad.numerics.SimpleOperators;
 import edu.stanford.rsl.conrad.numerics.SimpleVector;
 
-public class Sinogram {
+public class ParallelBeamRecon {
 	
 	private int numOfProjections;
 	private double angularIncrement;
@@ -25,16 +25,16 @@ public class Sinogram {
 	private Grid2D sinogram;
 	
 	public static void main(String[] args) {
-		Sinogram sinogram = new Sinogram(250, 500, 1.0);
+		ParallelBeamRecon recon = new ParallelBeamRecon(250, 500, 1.0);
 		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5});
 		phantom.show("phantom");
-		sinogram.computeSinogram(phantom, 1.0);
-		sinogram.getSinogram().show("sinogram");
+		recon.computeSinogram(phantom, 1.0);
+		recon.getSinogram().show("sinogram");
 		
-		sinogram.backProj(sinogram.getSinogram(), phantom).show("Backproj");
+		recon.backProj(recon.getSinogram(), phantom).show("Backproj");
 	}
 	
-	public Sinogram(int numOfProjections, int detectorSize, double detectorSpacing) {
+	public ParallelBeamRecon(int numOfProjections, int detectorSize, double detectorSpacing) {
 		this.numOfProjections = numOfProjections;
 		this.angularIncrement = Math.PI/numOfProjections;
 		this.detectorSize = detectorSize;
