@@ -32,9 +32,13 @@ public class ParallelBeamRecon {
 		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5});
 		phantom.show("phantom");
 		recon.computeSinogram(phantom, 1.0);
-		recon.getSinogram().show("sinogram");
 		
+		recon.getSinogram().show("sinogram");
 		recon.backProj(recon.getSinogram(), phantom).show("Backproj");
+		
+		Grid2D fSino = recon.filterSino(recon.getSinogram(), FilterType.RAMLAK);
+		fSino.show("RamLak");
+		recon.backProj(fSino, phantom).show("RamLak");
 	}
 	
 	public ParallelBeamRecon(int numOfProjections, int detectorSize, double detectorSpacing) {
@@ -46,7 +50,7 @@ public class ParallelBeamRecon {
 		this.sinogram = new Grid2D(detectorSize, numOfProjections);
 		this.sinogram.setSpacing(detectorSpacing, angularIncrement);
 //		double[] origin = new double[2];
-		this.sinogram.setOrigin(-(detectorSize-1)*(detectorSpacing/2.0), 0);
+		this.sinogram.setOrigin(-(detectorSize-1.0)*(detectorSpacing/2.0), 0);
 	}
 	
 	/**
@@ -134,7 +138,7 @@ public class ParallelBeamRecon {
 		
 		Grid2D backProj = new Grid2D(width, height);
 		backProj.setSpacing(spacing);
-		backProj.setOrigin(-(width-1)/2*spacing[0], -(height-1)/2*spacing[1]);
+		backProj.setOrigin(-(width-1.0)/2*spacing[0], -(height-1.0)/2*spacing[1]);
 		
 		// walk over all lines in sinogram
 		for (int i = 0; i < sinoheight; i++) {
@@ -178,20 +182,25 @@ public class ParallelBeamRecon {
 			// generate ramlak filter in spatial domain and convert it to frequency domain
 			
 			// apply definition of ramlak filter to Grid1D
-			filter.setAtIndex(0, 0.25f);
+			filter.setRealAtIndex(0, 0.25f);
+			filter.setImagAtIndex(0, 0.0f);
 			float factorOdd = -1.0f/(float)Math.pow(Math.PI, 2);
 			for (int i = 1; i < filterSize/2; i++) {
 				if (i%2 == 1) {
-					filter.setAtIndex(i, factorOdd/(float)Math.pow(i,2));
+					filter.setRealAtIndex(i, factorOdd/(float)Math.pow(i,2));
+					filter.setImagAtIndex(i, 0.0f);
 				} else {
-					filter.setAtIndex(i, 0.0f);
+					filter.setRealAtIndex(i, 0.0f);
+					filter.setImagAtIndex(i, 0.0f);
 				}
 			}
+			
 			float tmp;
 			for (int i = filterSize/2; i < filterSize; i++) {
 				tmp = filterSize - i;
                 if(1 == (i%2)){
-                    filter.setAtIndex(i, factorOdd / (float) Math.pow(tmp, 2));
+                    filter.setRealAtIndex(i, factorOdd / (float) Math.pow(tmp, 2));
+                    filter.setImagAtIndex(i, 0.0f);
                 }
 			}
 			
@@ -201,14 +210,38 @@ public class ParallelBeamRecon {
 		} else {
 			// generate ramp filter directly in frequency domain no conversion required
 			
-			filter.setAtIndex(0, 0.0f);
+			filter.setRealAtIndex(0, 0.0f);
+			filter.setImagAtIndex(0, 0.0f);
+			
+			for (int i = 1; i < filterSize/2; i++) {
+				filter.setRealAtIndex(i, i);
+				filter.setImagAtIndex(i, 0.0f);
+			}
+			float tmp;
+			for (int i = filterSize/2; i < filterSize; i++) {
+				tmp = filterSize - i;
+				filter.setRealAtIndex(i, tmp);
+				filter.setImagAtIndex(i, 0.0f);
+			}
 			
 		}
 		
+		Grid2D filteredSino = new Grid2D(sinogram.getWidth(), sinogram.getHeight());
 		
+		// walk over all lines, therefore get subgrid line per line and apply filter to line
+		for (int i = 0; i < sinogram.getHeight(); i++) {
+			Grid1DComplex sinof = new Grid1DComplex(sinogram.getSubGrid(i), true);
+			sinof.transformForward();
+			for (int p = 0; p < sinof.getSize()[0]; p++) {
+				sinof.multiplyAtIndex((p),  filter.getRealAtIndex(p), filter.getImagAtIndex(p));
+		    }
+			sinof.transformInverse();
+			for(int p = 0; p < sinof.getSize()[0]; p++) {
+                filteredSino.putPixelValue(p, i, sinof.getRealAtIndex(p));
+            }
+		}
 		
-		
-		return sinogram;
+		return filteredSino;
 	}
 	
 	public Grid2D getSinogram() {
