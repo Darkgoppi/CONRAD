@@ -13,6 +13,7 @@ import edu.stanford.rsl.conrad.geometry.shapes.simple.StraightLine;
 import edu.stanford.rsl.conrad.geometry.transforms.Translation;
 import edu.stanford.rsl.conrad.numerics.SimpleOperators;
 import edu.stanford.rsl.conrad.numerics.SimpleVector;
+import ij.ImageJ;
 
 public class ParallelBeamRecon {
 	
@@ -21,36 +22,38 @@ public class ParallelBeamRecon {
 	private int numOfProjections;
 	private double angularIncrement;
 	private int detectorSize;
-//	private double detectorSpacing;
+	private double detectorSpacing;
 	
 	private Box box;
 	
 	private Grid2D sinogram;
 	
 	public static void main(String[] args) {
+		new ImageJ();
+		
 		ParallelBeamRecon recon = new ParallelBeamRecon(250, 500, 1.0);
 		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5});
 		phantom.show("phantom");
-		recon.computeSinogram(phantom, 1.0);
 		
-		recon.getSinogram().show("sinogram");
-		recon.backProj(recon.getSinogram(), phantom).show("Backproj");
+		Grid2D sinogram = recon.computeSinogram(phantom, 1.0);
+		sinogram.show("sinogram");
+		recon.backProj(sinogram, 500, 500, 1.0, 1.0).show("Backproj");
 		
-		Grid2D fSino = recon.filterSino(recon.getSinogram(), FilterType.RAMLAK);
+		Grid2D fSino = recon.filterSino(sinogram, FilterType.RAMLAK);
 		fSino.show("RamLak");
-		recon.backProj(fSino, phantom).show("RamLak");
+		recon.backProj(fSino, 500, 500, 0.5, 0.5).show("RamLak");
 	}
 	
 	public ParallelBeamRecon(int numOfProjections, int detectorSize, double detectorSpacing) {
 		this.numOfProjections = numOfProjections;
 		this.angularIncrement = Math.PI/numOfProjections;
 		this.detectorSize = detectorSize;
-//		this.detectorSpacing = detectorSpacing;
+		this.detectorSpacing = detectorSpacing;
 		
-		this.sinogram = new Grid2D(detectorSize, numOfProjections);
-		this.sinogram.setSpacing(detectorSpacing, angularIncrement);
-//		double[] origin = new double[2];
-		this.sinogram.setOrigin(-(detectorSize-1.0)*(detectorSpacing/2.0), 0);
+//		this.sinogram = new Grid2D(detectorSize, numOfProjections);
+//		this.sinogram.setSpacing(detectorSpacing, angularIncrement);
+////		double[] origin = new double[2];
+//		this.sinogram.setOrigin(-(detectorSize-1.0)*(detectorSpacing/2.0), 0);
 	}
 	
 	/**
@@ -60,6 +63,11 @@ public class ParallelBeamRecon {
 	 * @return sinogram
 	 */
 	public Grid2D computeSinogram(Grid2D image, double samplingRate) {
+		
+		// initialize container for sinogram
+		Grid2D sinogram = new Grid2D(detectorSize, numOfProjections);
+		sinogram.setSpacing(detectorSpacing, angularIncrement);
+		sinogram.setOrigin(-(detectorSize-1.0)*(detectorSpacing/2.0), 0);
 		
 		// compute physical size of input image
 		double width = image.getSize()[0] * image.getSpacing()[0];
@@ -126,36 +134,44 @@ public class ParallelBeamRecon {
 		return sinogram;
 	}
 	
-	public Grid2D backProj(Grid2D sinogram, Grid2D phantom) {
+	/**
+	 * 
+	 * @param sinogram
+	 * @param width
+	 * @param height
+	 * @param reconSpacingX
+	 * @param reconSpacingY
+	 * @return
+	 */
+	public Grid2D backProj(Grid2D sinogram, int width, int height, double reconSpacingX, double reconSpacingY) {
 		
-		int sinowidth = sinogram.getWidth();
+		// get required information for reconstruction
+		int sinoWidth = sinogram.getWidth();
 		double widthSpacing = sinogram.getSpacing()[0];
-		int sinoheight = sinogram.getHeight();
+		int sinoHeight = sinogram.getHeight();
 		double heightSpacing = sinogram.getSpacing()[1];
-		int width = phantom.getWidth();
-		int height = phantom.getHeight();
-		double[] spacing = phantom.getSpacing();
 		
+		// create new Grid2D to hold the back projection
 		Grid2D backProj = new Grid2D(width, height);
-		backProj.setSpacing(spacing);
-		backProj.setOrigin(-(width-1.0)/2*spacing[0], -(height-1.0)/2*spacing[1]);
+		backProj.setSpacing(reconSpacingX, reconSpacingY);
+		backProj.setOrigin(-(width-1.0)/2*reconSpacingX, -(height-1.0)/2*reconSpacingY);
 		
-		// walk over all lines in sinogram
-		for (int i = 0; i < sinoheight; i++) {
+		// walk over all lines in sinogram is equal to number of projections in sinogram
+		for (int i = 0; i < sinoHeight; i++) {
 			double realAngle = i * heightSpacing;
 			double xValue = Math.cos(realAngle);
 			double yValue = Math.sin(realAngle);
 			
 			SimpleVector normVek = new SimpleVector(yValue, xValue);
 			
-			for (int x = 0; x < backProj.getSize()[0]; x++) {
-				for (int y = 0; y < backProj.getSize()[1]; y++) {
+			for (int x = 0; x < backProj.getWidth(); x++) {
+				for (int y = 0; y < backProj.getHeight(); y++) {
 					double[] coords = backProj.indexToPhysical(x, y);
 					SimpleVector pix = new SimpleVector(coords[0], coords[1]);
 					double innerPro = SimpleOperators.multiplyInnerProd(normVek, pix);
-					double dist = innerPro + (sinowidth-1)/2;
+					double dist = innerPro + (sinoWidth-1)/2;
 					double index = dist / widthSpacing;
-					Grid1D sub = new Grid1D(sinogram.getSubGrid(i));
+					Grid1D sub = sinogram.getSubGrid(i);
 					if(sub.getSize()[0] <= index+1 || index < 0){
 						continue;
 					}
@@ -164,48 +180,56 @@ public class ParallelBeamRecon {
 				}
 			}
 		}
-		NumericPointwiseOperators.divideBy(backProj, (float)(sinoheight / Math.PI));
+		NumericPointwiseOperators.divideBy(backProj, (float)(sinoHeight / Math.PI));
 		return backProj;
 	}
 	
+	/**
+	 * 
+	 * @param sinogram
+	 * @param filterType
+	 * @return
+	 */
 	public Grid2D filterSino(Grid2D sinogram, FilterType filterType) {
 		
 		// initialize filter grid
-		int filterSize = sinogram.getSize()[0];
-		Grid1DComplex filter = new Grid1DComplex(filterSize);
+		Grid1DComplex filter = new Grid1DComplex(sinogram.getSize()[0]);
+		int filterSize = filter.getSize()[0];
 		
 		// definition of filters
 		if (filterType == FilterType.NONE) {
 			// no filter to apply
 			return sinogram;
 		} else if (filterType == FilterType.RAMLAK) {
-			// generate ramlak filter in spatial domain and convert it to frequency domain
-			
+			/*
+			 * =========================================================================== 
+			 * generate ramlak filter in spatial domain and convert it to frequency domain
+			 * ===========================================================================
+			 */
 			// apply definition of ramlak filter to Grid1D
-			filter.setRealAtIndex(0, 0.25f);
-			filter.setImagAtIndex(0, 0.0f);
+			filter.setAtIndex(0, 0.25f);
+			
 			float factorOdd = -1.0f/(float)Math.pow(Math.PI, 2);
 			for (int i = 1; i < filterSize/2; i++) {
 				if (i%2 == 1) {
-					filter.setRealAtIndex(i, factorOdd/(float)Math.pow(i,2));
-					filter.setImagAtIndex(i, 0.0f);
+					filter.setAtIndex(i, factorOdd/(float)Math.pow(i,2));
 				} else {
-					filter.setRealAtIndex(i, 0.0f);
-					filter.setImagAtIndex(i, 0.0f);
+					filter.setAtIndex(i, 0.0f);
 				}
 			}
 			
 			float tmp;
 			for (int i = filterSize/2; i < filterSize; i++) {
 				tmp = filterSize - i;
-                if(1 == (i%2)){
-                    filter.setRealAtIndex(i, factorOdd / (float) Math.pow(tmp, 2));
-                    filter.setImagAtIndex(i, 0.0f);
+                if((i%2) == 1){
+                    filter.setAtIndex(i, factorOdd / (float) Math.pow(tmp, 2));
                 }
 			}
 			
 			// convert filter into frequency domain
+//			filter.show();
 			filter.transformForward();
+//			filter.show();
 			
 		} else {
 			// generate ramp filter directly in frequency domain no conversion required
@@ -232,12 +256,16 @@ public class ParallelBeamRecon {
 		for (int i = 0; i < sinogram.getHeight(); i++) {
 			Grid1DComplex sinof = new Grid1DComplex(sinogram.getSubGrid(i), true);
 			sinof.transformForward();
+			
 			for (int p = 0; p < sinof.getSize()[0]; p++) {
 				sinof.multiplyAtIndex((p),  filter.getRealAtIndex(p), filter.getImagAtIndex(p));
 		    }
 			sinof.transformInverse();
-			for(int p = 0; p < sinof.getSize()[0]; p++) {
-                filteredSino.putPixelValue(p, i, sinof.getRealAtIndex(p));
+			
+			Grid1D ret = new Grid1D(sinogram.getWidth());
+	        ret = sinof.getRealSubGrid(0, sinogram.getSize()[0]);
+			for(int p = 0; p < ret.getSize()[0]; p++) {
+                filteredSino.putPixelValue(p, i, ret.getAtIndex(p));
             }
 		}
 		

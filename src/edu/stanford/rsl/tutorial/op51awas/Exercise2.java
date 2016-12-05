@@ -197,13 +197,13 @@ public class Exercise2 {
 					subCom.setAtIndex(j, (float)(-1/(Math.pow((k - j), 2) * Math.pow(Math.PI, 2))));
 				}
 			}
-//			if(i == 0){
-//				subCom.show();
-//				i = 0;
-//			}
+			if(i == 0){
+				subCom.show();
+				i = 0;
+			}
 			
 			subCom.transformForward();
-//			subCom.show();
+			subCom.show();
 			Grid1DComplex filteredSino = new Grid1DComplex(sub);
 			filteredSino.transformForward();
 			for (int j = 0; j < filteredSino.getSize()[0]; j++) {
