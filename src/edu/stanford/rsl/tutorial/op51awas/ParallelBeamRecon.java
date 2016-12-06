@@ -24,14 +24,10 @@ public class ParallelBeamRecon {
 	private int detectorSize;
 	private double detectorSpacing;
 	
-	private Box box;
-	
-	private Grid2D sinogram;
-	
 	public static void main(String[] args) {
 		new ImageJ();
 		
-		ParallelBeamRecon recon = new ParallelBeamRecon(250, 500, 1.0);
+		ParallelBeamRecon recon = new ParallelBeamRecon(200, 500, 1.0);
 		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5});
 		phantom.show("phantom");
 		
@@ -39,9 +35,13 @@ public class ParallelBeamRecon {
 		sinogram.show("sinogram");
 		recon.backProj(sinogram, 500, 500, 1.0, 1.0).show("Backproj");
 		
-		Grid2D fSino = recon.filterSino(sinogram, FilterType.RAMLAK);
-		fSino.show("RamLak");
-		recon.backProj(fSino, 500, 500, 0.5, 0.5).show("RamLak");
+		Grid2D lakSino = recon.filterSino(sinogram, FilterType.RAMLAK);
+		lakSino.show("RamLak");
+		recon.backProj(lakSino, 500, 500, 1.0, 1.0).show("RamLak");
+		
+		Grid2D ramSino = recon.filterSino(sinogram, FilterType.RAMP);
+		ramSino.show("Ramp");
+		recon.backProj(ramSino, 500, 500, 1.0, 1.0).show("Ramp");
 	}
 	
 	public ParallelBeamRecon(int numOfProjections, int detectorSize, double detectorSpacing) {
@@ -77,7 +77,7 @@ public class ParallelBeamRecon {
         Translation trans = new Translation(image.getOrigin()[0], image.getOrigin()[1], -1);
 		
         // box for overlaying image to get hits of a line at the image borders
-		box = new Box(width, height, 2);
+		Box box = new Box(width, height, 2);
 		box.applyTransform(trans);
 		
 		// initial angle of detector
@@ -156,7 +156,7 @@ public class ParallelBeamRecon {
 		backProj.setSpacing(reconSpacingX, reconSpacingY);
 		backProj.setOrigin(-(width-1.0)/2*reconSpacingX, -(height-1.0)/2*reconSpacingY);
 		
-		// walk over all lines in sinogram is equal to number of projections in sinogram
+		// walk over all lines in sinogram which is equal to number of projections in sinogram
 		for (int i = 0; i < sinoHeight; i++) {
 			double realAngle = i * heightSpacing;
 			double xValue = Math.cos(realAngle);
@@ -169,7 +169,7 @@ public class ParallelBeamRecon {
 					double[] coords = backProj.indexToPhysical(x, y);
 					SimpleVector pix = new SimpleVector(coords[0], coords[1]);
 					double innerPro = SimpleOperators.multiplyInnerProd(normVek, pix);
-					double dist = innerPro + (sinoWidth-1)/2;
+					double dist = innerPro + (sinoWidth-1.0)/2;
 					double index = dist / widthSpacing;
 					Grid1D sub = sinogram.getSubGrid(i);
 					if(sub.getSize()[0] <= index+1 || index < 0){
@@ -232,25 +232,27 @@ public class ParallelBeamRecon {
 //			filter.show();
 			
 		} else {
-			// generate ramp filter directly in frequency domain no conversion required
+			/*
+			 * ========================================================================
+			 * generate ramp filter directly in frequency domain no conversion required
+			 * ======================================================================== 
+			 */
+			filter.setAtIndex(0, 0.0f);
 			
-			filter.setRealAtIndex(0, 0.0f);
-			filter.setImagAtIndex(0, 0.0f);
+			double deltaf = 1.0/(sinogram.getSpacing()[0] * filterSize);
+			for (int j = 1; j < filterSize/2; j++) {
+				filter.setAtIndex(j, (float)(Math.abs(j * deltaf)));
+			}
+			for (int j = filterSize/2; j < filterSize; j++) {
+				filter.setAtIndex(j,(float)(Math.abs(((filterSize/2 - 1.0) *  deltaf) - ((j - filterSize/2) * deltaf))));
+			}
 			
-			for (int i = 1; i < filterSize/2; i++) {
-				filter.setRealAtIndex(i, i);
-				filter.setImagAtIndex(i, 0.0f);
-			}
-			float tmp;
-			for (int i = filterSize/2; i < filterSize; i++) {
-				tmp = filterSize - i;
-				filter.setRealAtIndex(i, tmp);
-				filter.setImagAtIndex(i, 0.0f);
-			}
+//			filter.show();
 			
 		}
 		
 		Grid2D filteredSino = new Grid2D(sinogram.getWidth(), sinogram.getHeight());
+		filteredSino.setSpacing(sinogram.getSpacing());
 		
 		// walk over all lines, therefore get subgrid line per line and apply filter to line
 		for (int i = 0; i < sinogram.getHeight(); i++) {
@@ -270,9 +272,5 @@ public class ParallelBeamRecon {
 		}
 		
 		return filteredSino;
-	}
-	
-	public Grid2D getSinogram() {
-		return this.sinogram;
 	}
 }
