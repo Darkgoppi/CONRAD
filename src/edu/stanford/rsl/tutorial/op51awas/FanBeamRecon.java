@@ -11,6 +11,7 @@ import edu.stanford.rsl.conrad.geometry.shapes.simple.PointND;
 import edu.stanford.rsl.conrad.geometry.shapes.simple.StraightLine;
 import edu.stanford.rsl.conrad.geometry.transforms.Translation;
 import edu.stanford.rsl.conrad.numerics.SimpleVector;
+import edu.stanford.rsl.tutorial.op51awas.ParallelBeamRecon.FilterType;
 
 public class FanBeamRecon {
 
@@ -25,13 +26,25 @@ public class FanBeamRecon {
 	public static void main(String[] args) {
 		
 		SimplePhantom phant = new SimplePhantom(250, 250, new double[]{0.5, 0.5});
-		FanBeamRecon rec = new FanBeamRecon(250, 250, 1.0, 1200, 750);
+		FanBeamRecon rec = new FanBeamRecon(250, 250, 1.0, 1200, 900);
 		
-		Grid2D sino = rec.computeFanogram(phant, 1.0);
+		Grid2D fano = rec.computeFanogram(phant, 1.0);
+		Grid2D sino = rec.performRebinning(fano);
 		
 		new ImageJ();
-		phant.show();
-		sino.show();
+		phant.show("phantom");
+		fano.show("fanogram");
+		sino.show("sinogram");
+		
+		ParallelBeamRecon recon = new ParallelBeamRecon();
+		
+		recon.backProj(sino, 250, 250, 1.0, 1.0).show("#nofilter");
+				
+		Grid2D sinoRamLak = recon.filterSino(sino, FilterType.RAMLAK);
+		recon.backProj(sinoRamLak, 250, 250, 1.0, 1.0).show("RamLak");
+		
+		Grid2D sinoRamp = recon.filterSino(sino, FilterType.RAMP);
+		recon.backProj(sinoRamp, 250, 250, 1.0, 1.0).show("Ramp");
 	}
 
 	public FanBeamRecon(int numOfProjections, int detectorSize, double detectorSpacing, double dSD, double dSI) {
@@ -49,9 +62,9 @@ public class FanBeamRecon {
 	public Grid2D computeFanogram(Grid2D image, double samplingRate) {
 
 		// initialize container for sinogram
-		Grid2D sinogram = new Grid2D(detectorSize, numOfProjections);
-		sinogram.setSpacing(detectorSpacing, angularIncrement);
-		sinogram.setOrigin(-(detectorSize-1.0)*(detectorSpacing/2.0), 0);
+		Grid2D fanogram = new Grid2D(detectorSize, numOfProjections);
+		fanogram.setSpacing(detectorSpacing, angularIncrement);
+		fanogram.setOrigin(-(detectorSize-1.0)*(detectorSpacing/2.0), 0);
 
 		// compute physical size of input image
 		double width = image.getSize()[0] * image.getSpacing()[0];
@@ -78,16 +91,13 @@ public class FanBeamRecon {
 			// determine detector middle, thanks to symmetry just the negative of source position
 			PointND detectorMiddle = new PointND((-sourceDetDist+sourceIsoDist)*xDir, (-sourceDetDist+sourceIsoDist)*yDir, 0);
 			
-			if (curAngle > Math.PI/2-angularIncrement && curAngle < Math.PI/2+angularIncrement) {
-				System.out.println(sourcePos);
-			}
 			SimpleVector detectorMid = detectorMiddle.getAbstractVector().clone();
 			
 			// determine normal vector of conjunction between source position and detector middle
 //			double normDirX = Math.cos(Math.PI - curAngle);
 //			double normDirY = Math.sin(Math.PI - curAngle);
-			double normDirX = xDir;
-			double normDirY = -yDir;
+			double normDirX = yDir;
+			double normDirY = -xDir;
 			SimpleVector dir = new SimpleVector(normDirX, normDirY, 0);
 			
 			double detectorHalf = (detectorSize*detectorSpacing)/2;
@@ -101,9 +111,6 @@ public class FanBeamRecon {
 				
 				SimpleVector curStep = dir.multipliedBy(step).clone();
 				curStep.add(detectorMid);
-				if (s == 0) {
-					System.out.println(curStep.toString());
-				}
 				PointND curPoint = new PointND(curStep);
 				StraightLine line = new StraightLine(sourcePos, curPoint);
 				ArrayList<PointND> hits = box.intersect(line);
@@ -112,15 +119,15 @@ public class FanBeamRecon {
 					PointND start = hits.get(0);
 					PointND end = hits.get(1);
 					SimpleVector lineDir = end.getAbstractVector().clone();
-					dir.subtract(start.getAbstractVector());
+					lineDir.subtract(start.getAbstractVector());
 					double length = lineDir.normL2();
 					
-					dir.divideBy(length / samplingRate);
+					lineDir.divideBy(length / samplingRate);
 					
 					float sum = 0.0f;
 					for (int t = 0; t < (length/samplingRate); t++) {
 						PointND cur = new PointND(start);
-						cur.getAbstractVector().add(dir.multipliedBy(t));
+						cur.getAbstractVector().add(lineDir.multipliedBy(t));
 						double curX = cur.getCoordinates()[0] * image.getSpacing()[0];
 						double curY = cur.getCoordinates()[1] * image.getSpacing()[1];
 						
@@ -131,12 +138,36 @@ public class FanBeamRecon {
 					}
 					
 					sum /= samplingRate;
-					sinogram.setAtIndex(s, i, sum);
+					fanogram.setAtIndex(s, i, sum);
 					
 				}
 			}
 		}
 
+		return fanogram;
+	}
+	
+	public Grid2D performRebinning(Grid2D fanogram) {
+		
+		double[] spacing = fanogram.getSpacing();
+		int height = (int)(Math.PI/spacing[1]);
+		Grid2D sinogram = new Grid2D(fanogram.getWidth(), height);
+		sinogram.setSpacing(spacing);
+		sinogram.setOrigin(fanogram.getOrigin());
+		
+		for (int s = 0; s < sinogram.getWidth(); s++) {
+			for (int theta = 0; theta < sinogram.getHeight(); theta++) {
+				double[] physCoords = sinogram.indexToPhysical(s, theta);
+				
+				double gamma = Math.asin((physCoords[0]/sourceIsoDist));
+				double beta = physCoords[1] - gamma;
+				double t = Math.tan(gamma) * sourceDetDist;
+				
+				double[] fanoIdxCoords = fanogram.physicalToIndex(t, beta);
+				sinogram.setAtIndex(s, theta, InterpolationOperators.interpolateLinear(fanogram, fanoIdxCoords[0], fanoIdxCoords[1]));
+			}
+		}
+		
 		return sinogram;
 	}
 

@@ -28,10 +28,10 @@ public class ParallelBeamRecon {
 		new ImageJ();
 		
 		ParallelBeamRecon recon = new ParallelBeamRecon(200, 500, 1.0);
-		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5});
+		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5}, 50.0);
 		phantom.show("phantom");
 		
-		Grid2D sinogram = recon.computeSinogram(phantom, 1.0);
+		Grid2D sinogram = recon.computeSinogram(phantom, 0.05);
 		sinogram.show("sinogram");
 		recon.backProj(sinogram, 500, 500, 1.0, 1.0).show("Backproj");
 		
@@ -42,6 +42,10 @@ public class ParallelBeamRecon {
 		Grid2D ramSino = recon.filterSino(sinogram, FilterType.RAMP);
 		ramSino.show("Ramp");
 		recon.backProj(ramSino, 500, 500, 1.0, 1.0).show("Ramp");
+	}
+	
+	public ParallelBeamRecon() {
+		
 	}
 	
 	public ParallelBeamRecon(int numOfProjections, int detectorSize, double detectorSpacing) {
@@ -146,8 +150,6 @@ public class ParallelBeamRecon {
 	public Grid2D backProj(Grid2D sinogram, int width, int height, double reconSpacingX, double reconSpacingY) {
 		
 		// get required information for reconstruction
-		int sinoWidth = sinogram.getWidth();
-		double widthSpacing = sinogram.getSpacing()[0];
 		int sinoHeight = sinogram.getHeight();
 		double heightSpacing = sinogram.getSpacing()[1];
 		
@@ -169,13 +171,9 @@ public class ParallelBeamRecon {
 					double[] coords = backProj.indexToPhysical(x, y);
 					SimpleVector pix = new SimpleVector(coords[0], coords[1]);
 					double innerPro = SimpleOperators.multiplyInnerProd(normVek, pix);
-					double dist = innerPro + (sinoWidth-1.0)/2;
-					double index = dist / widthSpacing;
+					double[] dist = sinogram.physicalToIndex(innerPro, 0);
 					Grid1D sub = sinogram.getSubGrid(i);
-					if(sub.getSize()[0] <= index+1 || index < 0){
-						continue;
-					}
-					float intens = InterpolationOperators.interpolateLinear(sub, index);
+					float intens = InterpolationOperators.interpolateLinear(sub, dist[0]);
 					backProj.addAtIndex(x, y, intens);
 				}
 			}
@@ -251,8 +249,7 @@ public class ParallelBeamRecon {
 			
 		}
 		
-		Grid2D filteredSino = new Grid2D(sinogram.getWidth(), sinogram.getHeight());
-		filteredSino.setSpacing(sinogram.getSpacing());
+		Grid2D filteredSino = new Grid2D(sinogram);
 		
 		// walk over all lines, therefore get subgrid line per line and apply filter to line
 		for (int i = 0; i < sinogram.getHeight(); i++) {

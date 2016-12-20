@@ -91,5 +91,30 @@ public class SimplePhantom extends Grid2D{
 		}
 		
 	}
+	
+	public SimplePhantom(int width, int height, double[] spacing, double radius) {
+		
+		super(width, height);
+		setSpacing(spacing);
+		double[] origin = new double[2];
+		origin[0] = -(width-1)*(spacing[0]/2);
+		origin[1] = -(height-1)*(spacing[1]/2);
+		
+		setOrigin(origin);
+		
+		int[] center = new int[2];
+		center[0] = width / 2 + 50;
+		center[1] = height / 2;
+		
+		for (int i = center[0]-(int)radius; i <= center[0]+(int)radius; i++) {
+			for (int j = center[1]-(int)radius; j <= center[1]+(int)radius; j++) {
+				double tmpRadius = Math.sqrt(Math.pow((i-center[0]), 2) + Math.pow((j-center[1]), 2));
+				if (tmpRadius <= radius) {
+					this.setAtIndex(i, j, 0.8f);
+				}
+			}
+		}
+		
+	}
 
 }
