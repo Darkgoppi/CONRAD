@@ -164,6 +164,14 @@ public class FanBeamRecon {
 				double t = Math.tan(gamma) * sourceDetDist;
 				
 				double[] fanoIdxCoords = fanogram.physicalToIndex(t, beta);
+				
+				// TODO needs some more tweeking: I know there is a problem with height indices
+				if (fanoIdxCoords[1] < 0) {
+					fanoIdxCoords[1] += (fanogram.getHeight()-1);
+				} else if (fanoIdxCoords[1] > (fanogram.getHeight())-1) {
+					fanoIdxCoords[1] -= (fanogram.getHeight()-1);
+				}
+				
 				sinogram.setAtIndex(s, theta, InterpolationOperators.interpolateLinear(fanogram, fanoIdxCoords[0], fanoIdxCoords[1]));
 			}
 		}
