@@ -27,7 +27,7 @@ public class ParallelBeamRecon {
 	public static void main(String[] args) {
 		new ImageJ();
 		
-		ParallelBeamRecon recon = new ParallelBeamRecon(200, 500, 1.0);
+		ParallelBeamRecon recon = new ParallelBeamRecon(200, 500, 0.7);
 		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5}, 50.0);
 		phantom.show("phantom");
 		

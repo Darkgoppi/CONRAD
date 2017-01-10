@@ -26,9 +26,10 @@ public class FanBeamRecon {
 	public static void main(String[] args) {
 		
 		SimplePhantom phant = new SimplePhantom(250, 250, new double[]{0.5, 0.5});
-		FanBeamRecon rec = new FanBeamRecon(250, 250, 1.0, 1200, 900);
+//		SimplePhantom phant = new SimplePhantom(250, 250, new double[]{0.5, 0.5}, 25.0);
+		FanBeamRecon rec = new FanBeamRecon(250, 500, 0.7, 1200, 600);
 		
-		Grid2D fano = rec.computeFanogram(phant, 1.0);
+		Grid2D fano = rec.computeFanogram(phant, 0.5);
 		Grid2D sino = rec.performRebinning(fano);
 		
 		new ImageJ();
@@ -163,14 +164,22 @@ public class FanBeamRecon {
 				double beta = physCoords[1] - gamma;
 				double t = Math.tan(gamma) * sourceDetDist;
 				
+				if (beta < 0) {
+					beta += Math.PI;
+				}
+				
 				double[] fanoIdxCoords = fanogram.physicalToIndex(t, beta);
 				
+				
+				
 				// TODO needs some more tweeking: I know there is a problem with height indices
-				if (fanoIdxCoords[1] < 0) {
-					fanoIdxCoords[1] += (fanogram.getHeight()-1);
-				} else if (fanoIdxCoords[1] > (fanogram.getHeight())-1) {
-					fanoIdxCoords[1] -= (fanogram.getHeight()-1);
-				}
+//				if (fanoIdxCoords[1] < 0) {
+//					fanoIdxCoords = fanogram.physicalToIndex(-t, beta);
+//					fanoIdxCoords[1] += (fanogram.getHeight()-1);
+//				} else if (fanoIdxCoords[1] > (fanogram.getHeight())-1) {
+//					fanoIdxCoords = fanogram.physicalToIndex(-t, beta);
+//					fanoIdxCoords[1] -= (fanogram.getHeight()-1);
+//				}
 				
 				sinogram.setAtIndex(s, theta, InterpolationOperators.interpolateLinear(fanogram, fanoIdxCoords[0], fanoIdxCoords[1]));
 			}
