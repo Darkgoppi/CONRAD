@@ -27,7 +27,7 @@ public class FanBeamRecon {
 		
 		SimplePhantom phant = new SimplePhantom(250, 250, new double[]{0.5, 0.5});
 //		SimplePhantom phant = new SimplePhantom(250, 250, new double[]{0.5, 0.5}, 25.0);
-		FanBeamRecon rec = new FanBeamRecon(250, 500, 0.7, 1200, 600);
+		FanBeamRecon rec = new FanBeamRecon(250, 300, 0.7, 1200, 750);
 		
 		Grid2D fano = rec.computeFanogram(phant, 0.5);
 		Grid2D sino = rec.performRebinning(fano);
@@ -151,7 +151,8 @@ public class FanBeamRecon {
 	public Grid2D performRebinning(Grid2D fanogram) {
 		
 		double[] spacing = fanogram.getSpacing();
-		int height = (int)(Math.PI/spacing[1]);
+		int height = 180;
+		spacing[1] = Math.PI/height; // 1 .0 fuer Blume
 		Grid2D sinogram = new Grid2D(fanogram.getWidth(), height);
 		sinogram.setSpacing(spacing);
 		sinogram.setOrigin(fanogram.getOrigin());
@@ -162,11 +163,13 @@ public class FanBeamRecon {
 				
 				double gamma = Math.asin((physCoords[0]/sourceIsoDist));
 				double beta = physCoords[1] - gamma;
-				double t = Math.tan(gamma) * sourceDetDist;
 				
 				if (beta < 0) {
-					beta += Math.PI;
+					gamma = -gamma;
+					beta += Math.PI - 2 * gamma;
 				}
+				
+				double t = Math.tan(gamma) * sourceDetDist;
 				
 				double[] fanoIdxCoords = fanogram.physicalToIndex(t, beta);
 				
