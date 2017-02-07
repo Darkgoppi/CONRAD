@@ -22,7 +22,7 @@ import edu.stanford.rsl.conrad.data.numeric.opencl.OpenCLGrid2D;
 import edu.stanford.rsl.conrad.data.numeric.opencl.OpenCLGridOperators;
 import edu.stanford.rsl.conrad.opencl.OpenCLUtil;
 
-public class OpenCLAddition {
+public class OpenCLZeug {
 
 	// OpenCL CheatSheet
 
@@ -65,10 +65,8 @@ public class OpenCLAddition {
 		CLContext context = OpenCLUtil.getStaticContext();
 		CLDevice dev = context.getMaxFlopsDevice();
 		CLCommandQueue comQueue = dev.createCommandQueue();
-		
-//		InputStream stream = TestOpenCL.class
-//				.getResourceAsStream("openCLGridAddition.cl");
-		CLProgram prog = context.createProgram(OpenCLAddition.class.getResourceAsStream("openCLGridAddition.cl")).build();
+
+		CLProgram prog = context.createProgram(OpenCLZeug.class.getResourceAsStream("openCLGridAddition.cl")).build();
 		CLKernel kernelFunction = prog.createCLKernel("openCLGridAdd");
 
 		CLBuffer<FloatBuffer> gImgSize = context.createFloatBuffer(size.length, Mem.READ_ONLY);
@@ -118,5 +116,62 @@ public class OpenCLAddition {
 		new ImageJ();
 		new Grid2D(clGridRes).show();
 	}
+	
+	public Grid2D backProjOpenCL(Grid2D sinogram, double reconSpacingX, double reconSpacingY) throws IOException {
+		int[] size = sinogram.getSize();
+
+		OpenCLGrid2D clSino = new OpenCLGrid2D(sinogram);
+
+		OpenCLGrid2D clGridRes = new OpenCLGrid2D(new Grid2D(size[0], size[0]));
+		clGridRes.setSpacing(reconSpacingX, reconSpacingY);
+		clGridRes.setOrigin(-(size[0]-1.0)/2*reconSpacingX, -(size[0]-1.0)/2*reconSpacingY);
+
+		CLContext context = OpenCLUtil.getStaticContext();
+		CLDevice dev = context.getMaxFlopsDevice();
+		CLCommandQueue comQueue = dev.createCommandQueue();
+
+		CLProgram prog = context.createProgram(OpenCLZeug.class.getResourceAsStream("openCLBackProj.cl")).build();
+		CLKernel kernelFunction = prog.createCLKernel("openCLBackProj");
+
+		CLBuffer<FloatBuffer> gImgSize = context.createFloatBuffer(size.length, Mem.READ_ONLY);
+		gImgSize.getBuffer().put(new float[] { size[0], size[1] });
+		gImgSize.getBuffer().rewind();
+
+		CLImageFormat format = new CLImageFormat(ChannelOrder.INTENSITY,
+				ChannelType.FLOAT);
+
+		clSino.getDelegate().prepareForDeviceOperation();
+		clSino.getDelegate().getCLBuffer().getBuffer().rewind();
+		CLImage2d<FloatBuffer> clGrid1Tex = context.createImage2d(clSino
+				.getDelegate().getCLBuffer().getBuffer(), size[0], size[1],
+				format, Mem.READ_ONLY);
+		clSino.getDelegate().release();
+
+		clGridRes.getDelegate().prepareForDeviceOperation();
+
+		comQueue.putWriteImage(clGrid1Tex, true)
+				.putWriteBuffer(clGridRes.getDelegate().getCLBuffer(), true)
+				.putWriteBuffer(gImgSize, true).finish();
+
+		kernelFunction.rewind();
+		kernelFunction.putArg(clGrid1Tex).putArg(clGridRes.getDelegate().getCLBuffer()).putArg(gImgSize);
+
+		int bpBlockSize[] = { 32, 32 };
+		int maxWorkGroupSize = dev.getMaxWorkGroupSize();
+		int[] realLocalSize = new int[] {
+				Math.min((int) Math.pow(maxWorkGroupSize, 1 / 2.0),
+						bpBlockSize[0]),
+				Math.min((int) Math.pow(maxWorkGroupSize, 1 / 2.0),
+						bpBlockSize[1]) };
+		
+		int[] globalWorkSize = new int[]{OpenCLUtil.roundUp(realLocalSize[0], size[0]), OpenCLUtil.roundUp(realLocalSize[1], size[1])};
+		
+		comQueue.put2DRangeKernel(kernelFunction, 0, 0, globalWorkSize[0], globalWorkSize[1], realLocalSize[0], realLocalSize[1]).finish();
+		clGridRes.getDelegate().notifyDeviceChange();
+		
+		return (new Grid2D(clGridRes));
+	}
+	
+	
 
 }
