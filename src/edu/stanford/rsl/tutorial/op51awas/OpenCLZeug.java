@@ -28,11 +28,13 @@ public class OpenCLZeug {
 
 	public static void main(String[] args) {
 //		addGrid2DOpenCL();
-		try {
-			addGrid2DHostCode();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+//		try {
+//			addGrid2DHostCode();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+		
+		backProjOpenCL();
 	}
 
 	public static void addGrid2DOpenCL() {
@@ -49,6 +51,22 @@ public class OpenCLZeug {
 
 		new ImageJ();
 		clGrid1.show();
+	}
+	
+	public static void backProjOpenCL() {
+		ParallelBeamRecon recon = new ParallelBeamRecon(200, 500, 0.7);
+		Grid2D phantom = new SimplePhantom(250, 250, new double[]{0.5, 0.5}, 25.0);
+		Grid2D sinogram = recon.computeSinogram(phantom, 0.5);
+		
+		new ImageJ();
+		sinogram.show();
+		
+		try {
+			Grid2D res = backProjOpenCL(sinogram, 0.3, 0.3);
+			res.show();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public static void addGrid2DHostCode() throws IOException {
@@ -117,7 +135,7 @@ public class OpenCLZeug {
 		new Grid2D(clGridRes).show();
 	}
 	
-	public Grid2D backProjOpenCL(Grid2D sinogram, double reconSpacingX, double reconSpacingY) throws IOException {
+	public static Grid2D backProjOpenCL(Grid2D sinogram, double reconSpacingX, double reconSpacingY) throws IOException {
 		int[] size = sinogram.getSize();
 
 		OpenCLGrid2D clSino = new OpenCLGrid2D(sinogram);
@@ -136,7 +154,15 @@ public class OpenCLZeug {
 		CLBuffer<FloatBuffer> gImgSize = context.createFloatBuffer(size.length, Mem.READ_ONLY);
 		gImgSize.getBuffer().put(new float[] { size[0], size[1] });
 		gImgSize.getBuffer().rewind();
-
+		
+		CLBuffer<FloatBuffer> resSpac = context.createFloatBuffer(4, Mem.READ_ONLY);
+		resSpac.getBuffer().put(new float[] {(float)clGridRes.getSpacing()[0], (float)clGridRes.getSpacing()[1], (float)clSino.getSpacing()[0], (float)clSino.getSpacing()[1]});
+		resSpac.getBuffer().rewind();
+		
+		CLBuffer<FloatBuffer> resOrig = context.createFloatBuffer(3, Mem.READ_ONLY);
+		resOrig.getBuffer().put(new float[] {(float)clGridRes.getOrigin()[0], (float)clGridRes.getOrigin()[1], (float)clSino.getOrigin()[0]});
+		resOrig.getBuffer().rewind();
+		
 		CLImageFormat format = new CLImageFormat(ChannelOrder.INTENSITY,
 				ChannelType.FLOAT);
 
@@ -154,7 +180,7 @@ public class OpenCLZeug {
 				.putWriteBuffer(gImgSize, true).finish();
 
 		kernelFunction.rewind();
-		kernelFunction.putArg(clGrid1Tex).putArg(clGridRes.getDelegate().getCLBuffer()).putArg(gImgSize);
+		kernelFunction.putArg(clGrid1Tex).putArg(clGridRes.getDelegate().getCLBuffer()).putArg(resSpac).putArg(resOrig).putArg(gImgSize);
 
 		int bpBlockSize[] = { 32, 32 };
 		int maxWorkGroupSize = dev.getMaxWorkGroupSize();
@@ -164,7 +190,7 @@ public class OpenCLZeug {
 				Math.min((int) Math.pow(maxWorkGroupSize, 1 / 2.0),
 						bpBlockSize[1]) };
 		
-		int[] globalWorkSize = new int[]{OpenCLUtil.roundUp(realLocalSize[0], size[0]), OpenCLUtil.roundUp(realLocalSize[1], size[1])};
+		int[] globalWorkSize = new int[]{OpenCLUtil.roundUp(realLocalSize[0], size[0]), OpenCLUtil.roundUp(realLocalSize[1], size[0])};
 		
 		comQueue.put2DRangeKernel(kernelFunction, 0, 0, globalWorkSize[0], globalWorkSize[1], realLocalSize[0], realLocalSize[1]).finish();
 		clGridRes.getDelegate().notifyDeviceChange();
