@@ -31,7 +31,7 @@ public class ParallelBeamRecon {
 		Grid2D phantom = new SimplePhantom(500, 500, new double[]{0.5, 0.5}, 50.0);
 		phantom.show("phantom");
 		
-		Grid2D sinogram = recon.computeSinogram(phantom, 0.05);
+		Grid2D sinogram = recon.computeSinogram(phantom, 0.5);
 		sinogram.show("sinogram");
 		recon.backProj(sinogram, 500, 500, 1.0, 1.0).show("Backproj");
 		
