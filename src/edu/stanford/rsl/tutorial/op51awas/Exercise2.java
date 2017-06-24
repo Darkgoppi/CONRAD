@@ -18,7 +18,7 @@ import ij.ImageJ;
 public class Exercise2 {
 	
 	//-------Radon Transformation-------------------------------
-	public static Grid2D radonTrans(Phantom p, int numProj, int detSize, double detSpacing, double angularRange, double angularInc, double samplingRate) {
+	public static Grid2D radonTrans(Grid2D p, int numProj, int detSize, double detSpacing, double angularRange, double angularInc, double samplingRate) {
 		
 		Grid2D sino = new Grid2D(new float[detSize * numProj], detSize, numProj);
 		sino.setSpacing(detSpacing, angularInc);
@@ -226,7 +226,8 @@ public class Exercise2 {
 		double angularInc = angularRange/numProj;
 		double samplingRate = 0.05;
 		
-		Phantom phantom = new Phantom(width, height, spacingX, spacingY);
+//		Grid2D phantom = new Phantom(width, height, spacingX, spacingY);
+		Grid2D phantom = new SimplePhantom(width, height, new double[]{spacingX, spacingY}, 25);
 		phantom.show("Phantom");
 		System.out.println("Phantom-Origin: " + phantom.getOrigin()[0] + " " + phantom.getOrigin()[1]);
 		System.out.println("Phantom-Spacing: " + phantom.getSpacing()[0] + " " + phantom.getSpacing()[1]);

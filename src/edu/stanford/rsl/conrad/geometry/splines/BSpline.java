@@ -236,6 +236,7 @@ public class BSpline extends AbstractCurve {
 	 */
 	public double getWeight(double u, int i){
 		return N(u, i);
+//		return getWeightsOrder3(u, i);
 	}
 
 	/**
@@ -446,6 +447,44 @@ public class BSpline extends AbstractCurve {
 	@Override
 	public AbstractShape clone() {
 		return new BSpline(this);
+	}
+	
+	/**
+	 * Hardcode for Spline order 3
+	 * @param u
+	 * @param i
+	 * @return
+	 */
+	private double getWeightsOrder3(double u, int index){
+
+		boolean indexIsAllowed = false;
+		int j = 0;
+		for (j = 0; j < 3; j++) {
+			double firstKnot = knots[index+j];
+			double secondKnot = knots[index+j+1];
+			if (u >= firstKnot && u <= secondKnot && firstKnot != secondKnot) {
+				indexIsAllowed = true;
+				break;
+			} else {
+				indexIsAllowed = false;
+			}
+		}
+		
+		double[] revan = new double[4];
+		
+		if (indexIsAllowed) {
+			double idx = Math.floor(u);
+			double alpha = u - idx;
+			double oneAlpha = 1.0f - alpha;
+			double oneAlphaSquare = oneAlpha * oneAlpha;
+			double alphaSquare = alpha * alpha;
+
+			revan[0] = 1.0/6.0 * oneAlphaSquare * oneAlpha;
+			revan[1] = 2.0/3.0 - 0.5f * alphaSquare *(2.0f-alpha);
+			revan[2] = 2.0/3.0 - 0.5f * oneAlphaSquare * (2.0f-oneAlpha);
+			revan[3] = 1.0/6.0 * alphaSquare * alpha;
+		}
+		return revan[j];
 	}
 	
 }

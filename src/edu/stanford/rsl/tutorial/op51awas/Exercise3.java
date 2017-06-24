@@ -14,7 +14,7 @@ import ij.ImageJ;
 public class Exercise3 {
 	
 	//-----------------------------------------------------------------------------------------
-	public static Grid2D fanogram(Phantom phantom, double dSD, double dSI, int detSize, double detSpacing, int numOfProj, double fanAngle, double angularRange, double angularInc){
+	public static Grid2D fanogram(Grid2D phantom, double dSD, double dSI, int detSize, double detSpacing, int numOfProj, double fanAngle, double angularRange, double angularInc){
 		
 		double samplingRate= 1.0;
 		
@@ -136,7 +136,8 @@ public class Exercise3 {
 		double angularRange = Math.PI + fanAngle;
 		double angularInc = angularRange / numOfProj;
 		
-		Phantom phantom = new Phantom(width, height, spacingX, spacingY);
+		//Grid2D phantom = new Phantom(width, height, spacingX, spacingY);
+		Grid2D phantom = new SimplePhantom(width, height, new double[]{spacingX, spacingY}, 25);
 		phantom.show("Phantom");
 		System.out.println("Phantom-Origin: " + phantom.getOrigin()[0] + " " + phantom.getOrigin()[1]);
 		System.out.println("Phantom-Spacing: " + phantom.getSpacing()[0] + " " + phantom.getSpacing()[1]);
